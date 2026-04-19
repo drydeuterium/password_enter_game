@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Enter Password</title>
+
+  <!--
+    hello, source goblin.
+    there is no backend.
+    there is no database.
+    there is only spite.
+  -->
+
+  <style>
+    :root {
+      --bg: #e7e7e7;
+      --fg: #111111;
+      --sub: #333333;
+      --accent: #111111;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #111111;
+        --fg: #f2f2f2;
+        --sub: #cfcfcf;
+        --accent: #ffffff;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      background: var(--bg);
+      color: var(--fg);
+      font-family:
+        "Helvetica Neue",
+        Arial,
+        "Hiragino Sans",
+        "Yu Gothic",
+        "Meiryo",
+        sans-serif;
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .wrap {
+      width: min(960px, 92vw);
+      height: min(700px, 92vh);
+      display: grid;
+      grid-template-rows: 1.2fr 0.6fr 1fr;
+      justify-items: center;
+      align-items: center;
+    }
+
+    .title {
+      margin: 0;
+      font-size: clamp(52px, 8vw, 88px);
+      font-weight: 500;
+      text-align: center;
+      line-height: 1.08;
+      will-change: transform;
+    }
+
+    .title.shake {
+      animation: buzz 0.18s linear 1;
+    }
+
+    @keyframes buzz {
+      0%   { transform: translateX(0); }
+      15%  { transform: translateX(-5px); }
+      30%  { transform: translateX(5px); }
+      45%  { transform: translateX(-4px); }
+      60%  { transform: translateX(4px); }
+      75%  { transform: translateX(-2px); }
+      100% { transform: translateX(0); }
+    }
+
+    .message {
+      min-height: 1.5em;
+      font-size: clamp(20px, 2.5vw, 32px);
+      color: var(--sub);
+      text-align: center;
+      opacity: 0;
+      transition: opacity 0.12s ease;
+      white-space: pre-wrap;
+      padding: 0 1rem;
+    }
+
+    .message.show {
+      opacity: 1;
+    }
+
+    .form-area {
+      width: min(620px, 80vw);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .input-shell {
+      width: 100%;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      column-gap: 0.5rem;
+      font-size: clamp(38px, 5vw, 56px);
+    }
+
+    .input {
+      width: 100%;
+      border: none;
+      outline: none;
+      background: transparent;
+      color: var(--fg);
+      text-align: center;
+      font-size: clamp(26px, 4vw, 42px);
+      padding: 0.15em 0.3em;
+      caret-color: var(--accent);
+    }
+
+    .input::placeholder {
+      color: transparent;
+    }
+
+    .send {
+      border: none;
+      background: transparent;
+      color: var(--fg);
+      font-size: clamp(28px, 4vw, 40px);
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .send:hover,
+    .send:focus-visible {
+      opacity: 0.7;
+      outline: none;
+    }
+
+    .send:disabled,
+    .input:disabled {
+      opacity: 0.45;
+      cursor: default;
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <h1 id="title" class="title">Enter Password</h1>
+    <div id="message" class="message"></div>
+
+    <div class="form-area">
+      <form id="form" autocomplete="off" novalidate>
+        <div class="input-shell">
+          <span>[</span>
+          <input
+            id="input"
+            class="input"
+            type="text"
+            autocapitalize="off"
+            autocorrect="off"
+            spellcheck="false"
+            aria-label="password input"
+          />
+          <span>]</span>
+        </div>
+        <div style="text-align:center;">
+          <button id="send" class="send" type="submit">[send]</button>
+        </div>
+      </form>
+    </div>
+  </main>
+
+  <script>
+    /*
+      hi.
+      if you're reading this in devtools,
+      you are the easter egg.
+    */
+
+    const titleEl = document.getElementById("title");
+    const messageEl = document.getElementById("message");
+    const inputEl = document.getElementById("input");
+    const formEl = document.getElementById("form");
+    const sendEl = document.getElementById("send");
+
+    let state = 0;
+    let hideTimer = null;
+    let sqlRageCount = 0;
+
+    const states = [
+      {
+        title: "Enter Password",
+        answer: "Password",
+        near: ["password", "pass", "pw"],
+        nearMsg: "Read.",
+        nonsenseMsg: "What?"
+      },
+      {
+        title: "Password is incorrect.",
+        answer: "incorrect",
+        near: ["Incorrect", "incorrect.", "wrong"],
+        nearMsg: "On screen.",
+        nonsenseMsg: "No."
+      },
+      {
+        title: "Incorrect. Try again.",
+        answer: "again",
+        near: ["Again", "try again", "Incorrect"],
+        nearMsg: "The other word.",
+        nonsenseMsg: "Still no."
+      },
+      {
+        title: "Again? Really?",
+        answer: "Really",
+        near: ["really", "Again", "again"],
+        nearMsg: "Case.",
+        nonsenseMsg: "Not that."
+      },
+      {
+        title: "Better.",
+        answer: "Better.",
+        near: ["Better", "better"],
+        nearMsg: "Missing something.",
+        nonsenseMsg: "Look closer."
+      },
+      {
+        title: "Punctuation matters.",
+        answer: ".",
+        near: ["dot", "period", "。"],
+        nearMsg: "Not a word.",
+        nonsenseMsg: "Smaller."
+      },
+      {
+        title: "Fine.",
+        answer: "",
+        near: ["Fine", "fine"],
+        nearMsg: "Send nothing.",
+        nonsenseMsg: "Empty."
+      }
+    ];
+
+    const easterEggs = [
+      {
+        test: (raw, norm, flat) => norm === "hello",
+        reply: "world."
+      },
+      {
+        test: (raw, norm, flat) => norm === "hello world",
+        reply: "Groundbreaking."
+      },
+      {
+        test: (raw, norm, flat) => norm === "admin",
+        reply: "No."
+      },
+      {
+        test: (raw, norm, flat) => norm === "123456",
+        reply: "Of course."
+      },
+      {
+        test: (raw, norm, flat) => norm === "letmein",
+        reply: "Embarrassing."
+      },
+      {
+        test: (raw, norm, flat) => norm === "open sesame",
+        reply: "Wrong fairy tale."
+      },
+      {
+        test: (raw, norm, flat) => norm === "help" || norm === "hint",
+        reply: "Read."
+      },
+      {
+        test: (raw, norm, flat) => norm === "sudo",
+        reply: "Permission denied."
+      },
+      {
+        test: (raw, norm, flat) => norm === "rm -rf /" || flat.includes("rm-rf/"),
+        reply: "Tempting."
+      },
+      {
+        test: (raw, norm, flat) => flat.includes("<script") || flat.includes("alert("),
+        reply: "Oh, shut up.",
+        shake: true
+      },
+      {
+        test: (raw, norm, flat) =>
+          flat.includes("or1=1") ||
+          flat.includes("'or'1'='1") ||
+          flat.includes("\"or\"1\"=\"1") ||
+          flat.includes("droptable") ||
+          flat.includes("unionselect") ||
+          flat.includes("--"),
+        reply: () => {
+          sqlRageCount += 1;
+          if (sqlRageCount >= 3) return "STFU, you motherf**ker.";
+          if (sqlRageCount === 2) return "Still trying SQL injection?";
+          return "No database. Dumbass.";
+        },
+        shake: true
+      }
+    ];
+
+    function normalize(value) {
+      return value.trim();
+    }
+
+    function flatten(value) {
+      return value.toLowerCase().replace(/\s+/g, "");
+    }
+
+    function showMessage(text, persist = false) {
+      clearTimeout(hideTimer);
+      messageEl.textContent = text;
+      messageEl.classList.add("show");
+
+      if (!persist) {
+        hideTimer = setTimeout(() => {
+          messageEl.classList.remove("show");
+          messageEl.textContent = "";
+        }, 1000);
+      }
+    }
+
+    function clearMessage() {
+      clearTimeout(hideTimer);
+      messageEl.classList.remove("show");
+      messageEl.textContent = "";
+    }
+
+    function shakeTitle() {
+      titleEl.classList.remove("shake");
+      void titleEl.offsetWidth;
+      titleEl.classList.add("shake");
+    }
+
+    function updateTitle() {
+      if (state >= states.length) {
+        titleEl.textContent = "No password was ever needed.";
+        inputEl.disabled = true;
+        sendEl.disabled = true;
+        return;
+      }
+      titleEl.textContent = states[state].title;
+    }
+
+    function classify(value, s) {
+      const v = normalize(value);
+      if (v === s.answer) return "correct";
+      if (s.near.includes(v)) return "near";
+      return "nonsense";
+    }
+
+    function runEasterEgg(rawValue) {
+      const norm = normalize(rawValue).toLowerCase();
+      const flat = flatten(rawValue);
+
+      for (const egg of easterEggs) {
+        if (egg.test(rawValue, norm, flat)) {
+          const reply =
+            typeof egg.reply === "function" ? egg.reply() : egg.reply;
+
+          showMessage(reply);
+          if (egg.shake) shakeTitle();
+          inputEl.select();
+          return true;
+        }
+      }
+      return false;
+    }
+
+    formEl.addEventListener("submit", (e) => {
+      e.preventDefault();
+      if (state >= states.length) return;
+
+      const rawValue = inputEl.value;
+
+      if (runEasterEgg(rawValue)) {
+        return;
+      }
+
+      const s = states[state];
+      const kind = classify(rawValue, s);
+
+      if (kind === "correct") {
+        state += 1;
+        updateTitle();
+        clearMessage();
+        inputEl.value = "";
+        inputEl.focus();
+        return;
+      }
+
+      if (kind === "near") {
+        showMessage(s.nearMsg);
+        inputEl.select();
+        return;
+      }
+
+      showMessage(s.nonsenseMsg);
+      shakeTitle();
+      inputEl.select();
+    });
+
+    updateTitle();
+    inputEl.focus();
+
+    console.log("%chello, inspector.", "font-size: 18px; font-weight: bold;");
+    console.log("there is no secret in here worth finding.");
+    console.log("but thanks for checking.");
+  </script>
+</body>
+</html>
